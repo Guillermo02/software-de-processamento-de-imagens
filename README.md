@@ -7,7 +7,7 @@ Membros do projeto:
 - Arthur Cezar da Silveira Lima - RA:10409172
 - Gabriel Morgado Nogueira - RA:10409493
 - Guillermo Kuznietz - RA:10410134
-- 
+- Marcos Arambasic Rebelo da Silva - RA:10443260
 
 ## Estrutura do projeto
 O projeto segue a seguinte estrutura:
