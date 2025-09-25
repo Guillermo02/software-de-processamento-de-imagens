@@ -2,6 +2,10 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3_image/SDL_image.h>
+#include <SDL3_ttf/SDL_ttf.h>
+#include <math.h>
+
+#define NIVEIS 256
 
 static int eh_cinza(Uint8 r, Uint8 g, Uint8 b) {
     return (r == g && g == b);
@@ -12,7 +16,6 @@ SDL_Surface* converte_para_cinza(SDL_Surface *orig) {
     if (!orig) return NULL;
 
     // Criar nova surface com o mesmo formato e dimensões
-    SDL_PixelFormat fmt = orig->format;
     SDL_Surface *cinza = SDL_CreateSurface(orig->w, orig->h, orig->format);
     if (!cinza) {
         fprintf(stderr, "Erro ao criar surface cinza: %s\n", SDL_GetError());
@@ -47,7 +50,7 @@ SDL_Surface* converte_para_cinza(SDL_Surface *orig) {
             // Se já estiver em cinza, apenas copia
             Uint8 valor;
             if (eh_cinza(r, g, b)) {
-                valor = r;  // r == g == b
+                valor = r;
             } else {
                 double y_val = 0.2125 * r + 0.7154 * g + 0.0721 * b;
                 if (y_val < 0) y_val = 0;
@@ -67,7 +70,7 @@ SDL_Surface* converte_para_cinza(SDL_Surface *orig) {
                     *p = (Uint8)pixel_cinza; 
                     break;
                 case 2: 
-                    (Uint16)p = (Uint16)pixel_cinza; 
+                    *(Uint16*)p = (Uint16)pixel_cinza; 
                     break;
                 case 3:
                     if (SDL_BYTEORDER == SDL_BIG_ENDIAN) {
@@ -96,6 +99,51 @@ SDL_Surface* converte_para_cinza(SDL_Surface *orig) {
     return cinza;
 }
 
+
+// Preenche histograma de uma imagem em escala de cinza
+void calcular_histograma(SDL_Surface *img, int hist[NIVEIS]) {
+    for (int i = 0; i < NIVEIS; i++) hist[i] = 0;
+
+    for (int y = 0; y < img->h; y++) {
+        for (int x = 0; x < img->w; x++) {
+            Uint8 r, g, b, a;
+            SDL_ReadSurfacePixel(img, x, y, &r, &g, &b, &a);
+            hist[r]++;
+        }
+    }
+}
+
+// Calcula média e desvio padrão
+void estatisticas_histograma(int hist[NIVEIS], int total_pixels, double *media, double *desvio) {
+    // média
+    double soma = 0.0;
+    for (int i = 0; i < NIVEIS; i++) {
+        soma += i * hist[i];
+    }
+    *media = soma / total_pixels;
+
+    // desvio padrão
+    double soma2 = 0.0;
+    for (int i = 0; i < NIVEIS; i++) {
+        double diff = i - *media;
+        soma2 += diff * diff * hist[i];
+    }
+    *desvio = sqrt(soma2 / total_pixels);
+}
+
+// Classificações com base nas métricas
+const char* classificar_intensidade(double media) {
+    if (media < 85.0) return "escura";
+    else if (media < 170.0) return "media";
+    else return "clara";
+}
+
+const char* classificar_contraste(double desvio) {
+    if (desvio < 50.0) return "baixo";
+    else if (desvio < 100.0) return "medio";
+    else return "alto";
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Uso: %s caminho_da_imagem.ext\n", argv[0]);
@@ -107,10 +155,17 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    if (!TTF_Init()) {
+        fprintf(stderr, "Erro ao inicializar o SDL_ttf: %s\n", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
     SDL_Surface* imagem = IMG_Load(argv[1]);
     if (!imagem) {
         printf("Erro ao carregar a imagem: %s\n", SDL_GetError());
         SDL_Quit();
+        TTF_Quit();
         return 1;
     }
 
@@ -139,6 +194,7 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "Erro ao duplicar a surface: %s\n", SDL_GetError());
             SDL_DestroySurface(imagem);
             SDL_Quit();
+            TTF_Quit();
             return 1;
         }
     } else {
@@ -148,21 +204,23 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "Falha na conversão para escala de cinza.\n");
             SDL_DestroySurface(imagem);
             SDL_Quit();
+            TTF_Quit();
             return 1;
         }
     }
 
     // ############################# Campo de Exibição da janela principal #################################
-    // Tamanho fixo da janela
+    // Janela do tamanho da imagem
     int larguraP = img_cinza->w;
     int alturaP = img_cinza->h;
 
-    // Obtém as dimensões da tela principal
+    // Obtém as dimensões da tela principal ##################### checar uso
     SDL_DisplayID displayID = SDL_GetPrimaryDisplay();
     SDL_Rect area;
     if (!SDL_GetDisplayBounds(displayID, &area)) {
         SDL_Log("Erro ao obter as dimensões da tela: %s", SDL_GetError());
         SDL_Quit();
+        TTF_Quit();
         return 1;
     }
 
@@ -173,6 +231,7 @@ int main(int argc, char* argv[]) {
         SDL_DestroySurface(imagem);
         SDL_DestroySurface(img_cinza);
         SDL_Quit();
+        TTF_Quit();
         return 1;
     }
     // Cria renderer para a janela principal
@@ -183,6 +242,7 @@ int main(int argc, char* argv[]) {
         SDL_DestroySurface(img_cinza);
         SDL_DestroyWindow(win_main);
         SDL_Quit();
+        TTF_Quit();
         return 1;
     }
 
@@ -195,6 +255,7 @@ int main(int argc, char* argv[]) {
         SDL_DestroyWindow(win_main);
         SDL_DestroyRenderer(rend_main);
         SDL_Quit();
+        TTF_Quit();
         return 1;
     }
 
@@ -219,6 +280,7 @@ int main(int argc, char* argv[]) {
         SDL_DestroyRenderer(rend_main);
         SDL_DestroyTexture(tex);
         SDL_Quit();
+        TTF_Quit();
         return 1;
     }
 
@@ -232,8 +294,67 @@ int main(int argc, char* argv[]) {
         SDL_DestroyTexture(tex);
         SDL_DestroyWindow(win_sec);
         SDL_Quit();
+        TTF_Quit();
         return 1;
     }
+
+    // ############################ Análise e exibição do Histograma #################################
+    TTF_Font *fonte = TTF_OpenFont("OpenSans-Regular.ttf", 16);
+    if (!fonte) {
+        fprintf(stderr, "Erro ao abrir fonte: %s\n", SDL_GetError());
+        SDL_DestroySurface(imagem);
+        SDL_DestroySurface(img_cinza);
+        SDL_DestroyWindow(win_main);
+        SDL_DestroyRenderer(rend_main);
+        SDL_DestroyTexture(tex);
+        SDL_DestroyWindow(win_sec);
+        SDL_DestroyRenderer(rend_sec);
+        TTF_Quit();
+        SDL_Quit();
+        return 1;
+    }
+
+    int hist[NIVEIS];
+    calcular_histograma(img_cinza, hist);
+
+    int max_contagem = 0;
+    for (int i = 0; i < NIVEIS; i++) {
+        if (hist[i] > max_contagem) max_contagem = hist[i];
+    }
+
+    // dimensões da janela secundária
+    int sw, sh;
+    SDL_GetWindowSize(win_sec, &sw, &sh);
+
+    // margens
+    int margem_x = 20, margem_y = 20;
+    int largura_das_barras = (sw - 2*margem_x) / NIVEIS;
+
+    // desenha barras
+    for (int i = 0; i < NIVEIS; i++) {
+        float proporcao = (float)hist[i] / (float)max_contagem;
+        int altura_barra = (int)((sh - 2*margem_y) * proporcao);
+        SDL_FRect barra = {
+            margem_x + i * largura_das_barras,
+            sh - margem_y - altura_barra,
+            (float)largura_das_barras,
+            (float)altura_barra
+        };
+        SDL_SetRenderDrawColor(rend_sec, 100, 100, 255, 255);  // azul claro
+        SDL_RenderFillRect(rend_sec, &barra);
+    }
+
+    // renderiza o texto
+        SDL_Color cor = {200, 200, 200, 255};
+        SDL_Surface *surfText = TTF_RenderText_Blended(fonte, "Histograma", 0, cor);
+        if (!surfText) {
+            fprintf(stderr, "Erro ao criar a superfície de texto: %s\n", SDL_GetError());
+        }
+        SDL_Texture *texText = SDL_CreateTextureFromSurface(rend_sec, surfText);
+        SDL_FRect dst = { 0.0f, 0.0f, (float)surfText->w, (float)surfText->h };
+        SDL_RenderTexture(rend_sec, texText, NULL, &dst);
+        SDL_DestroyTexture(texText);
+        SDL_DestroySurface(surfText);
 
     // ############################### Loop de eventos & renderização ####################################
     bool quit = false;
@@ -247,7 +368,6 @@ int main(int argc, char* argv[]) {
         }
 
         // Render da janela principal
-        float aspect = (float)imagem->w / (float)imagem->h;
         SDL_FRect rect = { 0.0f, 0.0f, (float)larguraP, (float)alturaP };
 
         SDL_SetRenderDrawColor(rend_main, 0, 0, 0, 255);
@@ -268,6 +388,19 @@ int main(int argc, char* argv[]) {
         }
         SDL_RenderPresent(rend_sec);
 
+        // Desenhar o histograma
+        char buffer[128];
+        double media, desvio;
+        estatisticas_histograma(hist, img_cinza->w * img_cinza->h, &media, &desvio);
+
+        const char *clint = classificar_intensidade(media);
+        const char *clcont = classificar_contraste(desvio);
+
+        // monta string
+        snprintf(buffer, sizeof(buffer), "Media: %.2f (%s)\nDesvio: %.2f (%s)", media, clint, desvio, clcont);
+
+        
+        
         SDL_Delay(16);  // ~60 FPS
     }
 
@@ -288,7 +421,9 @@ int main(int argc, char* argv[]) {
     SDL_DestroyTexture(tex);
     SDL_DestroyWindow(win_sec);
     SDL_DestroyRenderer(rend_sec);
+    TTF_CloseFont(fonte);
 
     SDL_Quit();
+    TTF_Quit();
     return 0;
 }
