@@ -144,6 +144,38 @@ const char* classificar_contraste(double desvio) {
     else return "alto";
 }
 
+void render_histograma(SDL_Renderer *renderer, int *hist, int max_contagem, int largura, int altura) {
+    int margem_x = 20, margem_y = 20;
+    int largura_barras = (largura - 2 * margem_x) / NIVEIS;
+
+    for (int i = 0; i < NIVEIS; i++) {
+        float proporcao = (float)hist[i] / (float)max_contagem;
+        int altura_barra = (int)((altura - 2 * margem_y) * proporcao);
+        SDL_FRect barra = {
+            margem_x + i * largura_barras,
+            altura - margem_y - altura_barra,
+            (float)largura_barras,
+            (float)altura_barra
+        };
+        SDL_SetRenderDrawColor(renderer, 100, 100, 255, 255);
+        SDL_RenderFillRect(renderer, &barra);
+    }
+}
+
+void render_texto(SDL_Renderer *renderer, const char *texto, float x, float y, TTF_Font *fonte, SDL_Color cor) {
+    SDL_Surface *surfText = TTF_RenderText_Blended(fonte, texto, 0, cor);
+    if (surfText) {
+        SDL_Texture *texText = SDL_CreateTextureFromSurface(renderer, surfText);
+        SDL_FRect dst = { x, y, (float)surfText->w, (float)surfText->h };
+        SDL_RenderTexture(renderer, texText, NULL, &dst);
+        SDL_DestroyTexture(texText);
+        SDL_DestroySurface(surfText);
+    } else {
+        fprintf(stderr, "Erro ao criar a superfície de texto: %s\n", SDL_GetError());
+    }
+}
+
+
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Uso: %s caminho_da_imagem.ext\n", argv[0]);
@@ -322,39 +354,39 @@ int main(int argc, char* argv[]) {
         if (hist[i] > max_contagem) max_contagem = hist[i];
     }
 
-    // dimensões da janela secundária
-    int sw, sh;
-    SDL_GetWindowSize(win_sec, &sw, &sh);
+    // // dimensões da janela secundária
+    // int sw, sh;
+    // SDL_GetWindowSize(win_sec, &sw, &sh);
 
-    // margens
-    int margem_x = 20, margem_y = 20;
-    int largura_das_barras = (sw - 2*margem_x) / NIVEIS;
+    // // margens
+    // int margem_x = 20, margem_y = 20;
+    // int largura_das_barras = (sw - 2*margem_x) / NIVEIS;
 
-    // desenha barras
-    for (int i = 0; i < NIVEIS; i++) {
-        float proporcao = (float)hist[i] / (float)max_contagem;
-        int altura_barra = (int)((sh - 2*margem_y) * proporcao);
-        SDL_FRect barra = {
-            margem_x + i * largura_das_barras,
-            sh - margem_y - altura_barra,
-            (float)largura_das_barras,
-            (float)altura_barra
-        };
-        SDL_SetRenderDrawColor(rend_sec, 100, 100, 255, 255);  // azul claro
-        SDL_RenderFillRect(rend_sec, &barra);
-    }
+    // // desenha barras
+    // for (int i = 0; i < NIVEIS; i++) {
+    //     float proporcao = (float)hist[i] / (float)max_contagem;
+    //     int altura_barra = (int)((sh - 2*margem_y) * proporcao);
+    //     SDL_FRect barra = {
+    //         margem_x + i * largura_das_barras,
+    //         sh - margem_y - altura_barra,
+    //         (float)largura_das_barras,
+    //         (float)altura_barra
+    //     };
+    //     SDL_SetRenderDrawColor(rend_sec, 100, 100, 255, 255);  // azul claro
+    //     SDL_RenderFillRect(rend_sec, &barra);
+    // }
 
     // renderiza o texto
-        SDL_Color cor = {200, 200, 200, 255};
-        SDL_Surface *surfText = TTF_RenderText_Blended(fonte, "Histograma", 0, cor);
-        if (!surfText) {
-            fprintf(stderr, "Erro ao criar a superfície de texto: %s\n", SDL_GetError());
-        }
-        SDL_Texture *texText = SDL_CreateTextureFromSurface(rend_sec, surfText);
-        SDL_FRect dst = { 0.0f, 0.0f, (float)surfText->w, (float)surfText->h };
-        SDL_RenderTexture(rend_sec, texText, NULL, &dst);
-        SDL_DestroyTexture(texText);
-        SDL_DestroySurface(surfText);
+    SDL_Color cor = {200, 200, 200, 255};
+    // SDL_Surface *surfText = TTF_RenderText_Blended(fonte, "Histograma", 0, cor);
+    // if (!surfText) {
+    //     fprintf(stderr, "Erro ao criar a superfície de texto: %s\n", SDL_GetError());
+    // }
+    // SDL_Texture *texText = SDL_CreateTextureFromSurface(rend_sec, surfText);
+    // SDL_FRect dst = { 0.0f, 0.0f, (float)surfText->w, (float)surfText->h };
+    // SDL_RenderTexture(rend_sec, texText, NULL, &dst);
+    // SDL_DestroyTexture(texText);
+    // SDL_DestroySurface(surfText);
 
     // ############################### Loop de eventos & renderização ####################################
     bool quit = false;
@@ -381,25 +413,33 @@ int main(int argc, char* argv[]) {
         // Render da janela secundária ##### por enquanto só limpar com uma cor e desenhar um retângulo "botão"
         SDL_SetRenderDrawColor(rend_sec, 240, 240, 240, 255);
         SDL_RenderClear(rend_sec);
+
+        
         SDL_FRect button = { 50.0f, 200.0f, 300.0f, 60.0f };
         SDL_SetRenderDrawColor(rend_sec, 0, 120, 255, 255);
         if (!SDL_RenderFillRect(rend_sec, &button)) {
             fprintf(stderr, "Erro ao desenhar o botão: %s\n", SDL_GetError());
         }
-        SDL_RenderPresent(rend_sec);
 
         // Desenhar o histograma
-        char buffer[128];
-        double media, desvio;
-        estatisticas_histograma(hist, img_cinza->w * img_cinza->h, &media, &desvio);
-
-        const char *clint = classificar_intensidade(media);
-        const char *clcont = classificar_contraste(desvio);
-
-        // monta string
-        snprintf(buffer, sizeof(buffer), "Media: %.2f (%s)\nDesvio: %.2f (%s)", media, clint, desvio, clcont);
-
+        render_histograma(rend_sec, hist, max_contagem, larguraS-20, alturaS-20);
+        // Renderizar o texto
+        render_texto(rend_sec, "Histograma", 10, 10, fonte, cor);
         
+        SDL_RenderPresent(rend_sec);
+        
+        // Desenhar o histograma
+        // char buffer[128];
+        // double media, desvio;
+        // estatisticas_histograma(hist, img_cinza->w * img_cinza->h, &media, &desvio);
+
+        // const char *clint = classificar_intensidade(media);
+        // const char *clcont = classificar_contraste(desvio);
+
+        // // monta string
+        // snprintf(buffer, sizeof(buffer), "Media: %.2f (%s)\nDesvio: %.2f (%s)", media, clint, desvio, clcont);
+
+        // SDL_RenderPresent(rend_sec);
         
         SDL_Delay(16);  // ~60 FPS
     }
