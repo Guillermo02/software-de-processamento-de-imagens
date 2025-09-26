@@ -74,7 +74,9 @@ gcc main.c -IC:{caminho_do_projeto}\software-de-processamento-de-imagens\libs\SD
 ```
 
 
-**Aviso:** Substitua `{caminho_do_projeto}` pelo diretório completo onde você salvou o projeto.
+**Aviso 1:** Substitua `{caminho_do_projeto}` pelo diretório completo onde você salvou o projeto.
+
+**Aviso 2:** Salve a imagem que realizará o teste no diretório completo onde você salvou o projeto.
 
 **Dica:** Caso tenha MinGW instalado, tente compilar usando `mingw32-make`
 
