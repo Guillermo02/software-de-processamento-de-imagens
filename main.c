@@ -1,3 +1,21 @@
+/* Universidade Presbiteriana Mackenzie – Computação Visual – Projeto 1 (SDL3)
+Alunos:
+- Nome: Arthur Cezar da Silveira Lima       - RA: 10409172
+- Nome: Gabriel Morgado Nogueira            - RA: 10409493
+- Nome: Guillermo Kuznietz                  - RA: 10410134
+- Nome: Marcos Arambasic Rebelo da Silva    - RA: 10443260
+
+Compilação:
+Caso possua o MinGW instalado:
+mingw32-make
+
+Caso não tenha o MinGW instalado:
+gcc main.c -IC:{coloque-caminho-até-a-pasta}\software-de-processamento-de-imagens\libs\SDL3\include -o executavel -LC:{coloque-caminho-até-a-pasta}software-de-processamento-de-imagens\libs\SDL3\lib -lSDL3 -lSDL3_image -lSDL3_ttf
+
+Execução:
+./executavel caminho-para-imagem.png  
+*/
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
@@ -456,86 +474,97 @@ int main(int argc, char *argv[])
     SDL_WindowID id_sec = SDL_GetWindowID(win_sec);
 
     while (!quit)
+{
+    while (SDL_PollEvent(&event))
     {
-        while (SDL_PollEvent(&event))
+        if (event.type == SDL_EVENT_QUIT)
+            quit = true;
+
+        // Salvar imagem ao pressionar 'S'
+        if (event.type == SDL_EVENT_KEY_DOWN) {
+    if (event.key.key == SDLK_S) {
+        SDL_Surface *to_save = usando_equalizada ? img_eq : img_cinza;
+        if (IMG_SavePNG(to_save, "output_image.png") == 1)
+            printf("Imagem salva como 'output_image.png'\n");
+        else
+            fprintf(stderr, "Erro ao salvar PNG: %s\n", SDL_GetError());
+    }
+}
+
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
         {
-            if (event.type == SDL_EVENT_QUIT)
-                quit = true;
-
-            if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+            // Só considera cliques que acontecem na janela secundária
+            if (event.button.windowID == id_sec)
             {
-                // Só considera cliques que acontecem na janela secundária
-                if (event.button.windowID == id_sec)
+                float mx = event.button.x;
+                float my = event.button.y;
+
+                const float padding = 10.0f;
+                const float tituloAltura = 22.0f;
+                const float espacamento = 10.0f;
+                const float botaoAltura = 48.0f;
+
+                SDL_FRect areaHist = {
+                    padding,
+                    padding + tituloAltura + espacamento,
+                    larguraS - 2 * padding,
+                    alturaS - (padding + tituloAltura + espacamento) - (espacamento + botaoAltura + padding)};
+                if (areaHist.h < 40)
+                    areaHist.h = 40;
+
+                SDL_FRect button = {padding, areaHist.y + areaHist.h + espacamento, larguraS - 2 * padding, botaoAltura};
+
+                if (mx >= button.x && mx <= (button.x + button.w) &&
+                    my >= button.y && my <= (button.y + button.h))
                 {
-                    float mx = event.button.x;
-                    float my = event.button.y;
-
-                    const float padding = 10.0f;
-                    const float tituloAltura = 22.0f;
-                    const float espacamento = 10.0f;
-                    const float botaoAltura = 48.0f;
-
-                    SDL_FRect areaHist = {
-                        padding,
-                        padding + tituloAltura + espacamento,
-                        larguraS - 2 * padding,
-                        alturaS - (padding + tituloAltura + espacamento) - (espacamento + botaoAltura + padding)};
-                    if (areaHist.h < 40)
-                        areaHist.h = 40;
-
-                    SDL_FRect button = {padding, areaHist.y + areaHist.h + espacamento, larguraS - 2 * padding, botaoAltura};
-
-                    if (mx >= button.x && mx <= (button.x + button.w) &&
-                        my >= button.y && my <= (button.y + button.h))
-                    {
-                        usando_equalizada = !usando_equalizada;
-                    }
+                    usando_equalizada = !usando_equalizada;
                 }
             }
         }
-
-        // --- Render principal (imagem) ---
-        SDL_SetRenderDrawColor(rend_main, 0, 0, 0, 255);
-        SDL_RenderClear(rend_main);
-        SDL_FRect rect = {0, 0, (float)larguraP, (float)alturaP};
-        SDL_RenderTexture(rend_main, usando_equalizada ? tex_equalizada : tex_original, NULL, &rect);
-        SDL_RenderPresent(rend_main);
-
-        // --- Render secundária (UI) ---
-        SDL_SetRenderDrawColor(rend_sec, 240, 240, 240, 255);
-        SDL_RenderClear(rend_sec);
-
-        const float padding = 10.0f;
-        const float tituloAltura = 22.0f;
-        const float espacamento = 10.0f;
-        const float botaoAltura = 48.0f;
-
-        SDL_FRect areaHist = {
-            padding,
-            padding + tituloAltura + espacamento,
-            larguraS - 2 * padding,
-            alturaS - (padding + tituloAltura + espacamento) - (espacamento + botaoAltura + padding)};
-        if (areaHist.h < 40)
-            areaHist.h = 40;
-
-        if (usando_equalizada)
-            render_histograma(rend_sec, hist_eq, max_eq, areaHist);
-        else
-            render_histograma(rend_sec, hist_orig, max_orig, areaHist);
-
-        render_texto(rend_sec, usando_equalizada ? "Histograma (Equalizada)" : "Histograma (Original)",
-                     padding, padding, fonte, cor);
-
-        SDL_FRect button = {padding, areaHist.y + areaHist.h + espacamento, larguraS - 2 * padding, botaoAltura};
-        SDL_SetRenderDrawColor(rend_sec, 0, 120, 255, 255);
-        SDL_RenderFillRect(rend_sec, &button);
-        render_texto(rend_sec, usando_equalizada ? "Voltar para Original" : "Equalizar",
-                     button.x + 16, button.y + 12, fonte, (SDL_Color){255, 255, 255, 255});
-
-        SDL_RenderPresent(rend_sec);
-
-        SDL_Delay(16);
     }
+
+    // --- Render principal (imagem) ---
+    SDL_SetRenderDrawColor(rend_main, 0, 0, 0, 255);
+    SDL_RenderClear(rend_main);
+    SDL_FRect rect = {0, 0, (float)larguraP, (float)alturaP};
+    SDL_RenderTexture(rend_main, usando_equalizada ? tex_equalizada : tex_original, NULL, &rect);
+    SDL_RenderPresent(rend_main);
+
+    // --- Render secundária (UI) ---
+    SDL_SetRenderDrawColor(rend_sec, 240, 240, 240, 255);
+    SDL_RenderClear(rend_sec);
+
+    const float padding = 10.0f;
+    const float tituloAltura = 22.0f;
+    const float espacamento = 10.0f;
+    const float botaoAltura = 48.0f;
+
+    SDL_FRect areaHist = {
+        padding,
+        padding + tituloAltura + espacamento,
+        larguraS - 2 * padding,
+        alturaS - (padding + tituloAltura + espacamento) - (espacamento + botaoAltura + padding)};
+    if (areaHist.h < 40)
+        areaHist.h = 40;
+
+    if (usando_equalizada)
+        render_histograma(rend_sec, hist_eq, max_eq, areaHist);
+    else
+        render_histograma(rend_sec, hist_orig, max_orig, areaHist);
+
+    render_texto(rend_sec, usando_equalizada ? "Histograma (Equalizada)" : "Histograma (Original)",
+                 padding, padding, fonte, cor);
+
+    SDL_FRect button = {padding, areaHist.y + areaHist.h + espacamento, larguraS - 2 * padding, botaoAltura};
+    SDL_SetRenderDrawColor(rend_sec, 0, 120, 255, 255);
+    SDL_RenderFillRect(rend_sec, &button);
+    render_texto(rend_sec, usando_equalizada ? "Voltar para Original" : "Equalizar",
+                 button.x + 16, button.y + 12, fonte, (SDL_Color){255, 255, 255, 255});
+
+    SDL_RenderPresent(rend_sec);
+
+    SDL_Delay(16);
+}
 
     // salva a última imagem mostrada (opcional)
     if (!IMG_SavePNG(usando_equalizada ? img_eq : img_cinza, "saida.png"))
